@@ -53,4 +53,16 @@ return [
     |
     */
     'pattern' => '*.log',
+    
+    /*
+    |--------------------------------------------------------------------------
+    | Large File Threshold
+    |--------------------------------------------------------------------------
+    |
+    | Files larger than this size (in MB) will be loaded with pagination to
+    | improve performance. You can adjust this value based on your server's
+    | capabilities and the size of your log files.
+    |
+    */
+    'large_file_threshold' => 5,
 ];

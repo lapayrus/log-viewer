@@ -17,7 +17,4 @@ Route::group([
     
     Route::get('/search', [LogViewerController::class, 'search'])
         ->name('log-viewer.search');
-    
-    Route::get('/load-more', [LogViewerController::class, 'loadMore'])
-        ->name('log-viewer.load-more');
 });

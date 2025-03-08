@@ -42,12 +42,27 @@ class LogViewerController extends Controller
         // Get file size to determine if we need pagination
         $path = storage_path(config('log-viewer.path') . '/' . $file);
         $fileSize = File::exists($path) ? File::size($path) : 0;
-        $needsPagination = $fileSize > 5 * 1024 * 1024; // 5MB threshold
+        $largeFileThreshold = config('log-viewer.large_file_threshold', 5) * 1024 * 1024; // Get threshold from config
+        $needsPagination = $fileSize > $largeFileThreshold;
         
         // Get logs with pagination if needed
         if ($needsPagination) {
             $logs = $this->getLogsWithPagination($file, $level, $query, $page);
-            $hasMoreLogs = count($logs) >= 100; // We're loading 100 logs per page
+            
+            // Check if we need to show pagination controls
+            // If we have a search query, we need to check if there are more matching logs
+            // by trying to fetch one more log beyond our current page
+            if (!empty($query) || !empty($level)) {
+                // We're already using the improved getLogsWithPagination method that properly filters
+                // If we got a full page of results (100 logs), there might be more
+                $hasMoreLogs = count($logs) >= 100;
+                
+                // If we're on page > 1, we definitely have previous pages
+                $hasMoreLogs = $hasMoreLogs || $page > 1;
+            } else {
+                // No search/filter, just check if we got a full page
+                $hasMoreLogs = count($logs) >= 100;
+            }
         } else {
             $logs = $this->getLogs($file, $level, $query);
             $hasMoreLogs = false;
@@ -117,35 +132,6 @@ class LogViewerController extends Controller
             'currentLevel' => $level,
             'query' => $query,
             'results' => $results,
-        ]);
-    }
-
-    /**
-     * Load more logs via AJAX for infinite scrolling.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function loadMore(Request $request)
-    {
-        $file = $request->input('file');
-        $level = $request->input('level');
-        $query = $request->input('query');
-        $page = $request->input('page', 1);
-        
-        $logs = $this->getLogsWithPagination($file, $level, $query, $page);
-        $hasMoreLogs = count($logs) >= 100; // We're loading 100 logs per page
-        
-        $html = '';
-        foreach ($logs as $log) {
-            $html .= view('log-viewer::partials.log-row', [
-                'log' => $log
-            ])->render();
-        }
-        
-        return response()->json([
-            'html' => $html,
-            'hasMoreLogs' => $hasMoreLogs
         ]);
     }
 
@@ -242,61 +228,163 @@ class LogViewerController extends Controller
         if (!File::exists($path)) {
             return [];
         }
+        
         $perPage = 100;
         $offset = ($page - 1) * $perPage;
         $logs = [];
         $matchCount = 0;
+        $skipCount = 0;
         
-        // Open the file for reading
+        // Use a memory-efficient approach with file streaming
         $handle = fopen($path, 'r');
         if (!$handle) {
             return [];
         }
         
+        $pattern = '/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (\w+)\.(\w+):/'; 
         $currentEntry = null;
         $inEntry = false;
+        $buffer = '';
         
-        // Read the file line by line
-        while (($line = fgets($handle)) !== false) {
-            // Check if this line starts a new log entry
-            if (preg_match('/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (\w+)\.(\w+):/', $line, $matches)) {
-                // If we were processing an entry, finalize it
-                if ($inEntry && $currentEntry) {
-                    // Apply filters
-                    $shouldInclude = true;
-                    
-                    if ($level && strtolower($currentEntry['level']) !== strtolower($level)) {
-                        $shouldInclude = false;
-                    }
-                    
-                    if ($query && stripos($currentEntry['message'], $query) === false && 
-                        stripos($currentEntry['date'], $query) === false) {
-                        $shouldInclude = false;
-                    }
-                    
-                    if ($shouldInclude) {
-                        $matchCount++;
+        // If we're not on the first page, we need to count matching entries until we reach our offset
+        if ($page > 1) {
+            $targetSkipCount = $offset;
+            
+            // Read the file line by line
+            while (($line = fgets($handle)) !== false) {
+                // Check if this line starts a new log entry
+                if (preg_match($pattern, $line, $matches)) {
+                    // If we were processing an entry, finalize it
+                    if ($inEntry && $currentEntry) {
+                        // Extract message from buffer
+                        $message = trim(substr($buffer, strpos($buffer, ':') + 1));
                         
-                        // Only include if it's in our page range
-                        if ($matchCount > $offset && $matchCount <= $offset + $perPage) {
-                            $logs[] = [
-                                'level' => $currentEntry['level'],
-                                'date' => $currentEntry['date'],
-                                'environment' => $currentEntry['environment'],
-                                'message' => $this->formatMessage($currentEntry['message']),
-                                'is_long' => (substr_count($currentEntry['message'], "\n") > 1 || 
-                                             strlen($currentEntry['message']) > 300),
-                                'has_search_match' => $query && 
-                                                   (stripos($currentEntry['message'], $query) !== false || 
-                                                    stripos($currentEntry['date'], $query) !== false),
-                            ];
+                        // Apply filters
+                        $shouldInclude = true;
+                        
+                        if ($level && strtolower($currentEntry['level']) !== strtolower($level)) {
+                            $shouldInclude = false;
                         }
                         
-                        // If we've collected enough logs for this page, stop
-                        if ($matchCount >= $offset + $perPage) {
-                            break;
+                        if ($query && stripos($message, $query) === false && 
+                            stripos($currentEntry['date'], $query) === false) {
+                            $shouldInclude = false;
+                        }
+                        
+                        if ($shouldInclude) {
+                            $skipCount++;
+                            if ($skipCount >= $targetSkipCount) {
+                                // We've skipped enough entries, start collecting from here
+                                // Reset the buffer and prepare to process this entry
+                                $buffer = $line;
+                                $date = $matches[1];
+                                $environment = $matches[2];
+                                $logLevel = strtolower($matches[3]);
+                                
+                                $currentEntry = [
+                                    'level' => $logLevel,
+                                    'date' => $date,
+                                    'environment' => $environment,
+                                ];
+                                break;
+                            }
                         }
                     }
+                    
+                    // Start a new entry
+                    $date = $matches[1];
+                    $environment = $matches[2];
+                    $logLevel = strtolower($matches[3]);
+                    
+                    $currentEntry = [
+                        'level' => $logLevel,
+                        'date' => $date,
+                        'environment' => $environment,
+                    ];
+                    
+                    $buffer = $line;
+                    $inEntry = true;
+                } elseif ($inEntry) {
+                    // Append to the buffer
+                    $buffer .= $line;
+                }
+            }
+            
+            // If we couldn't skip to the right position, return empty
+            if ($skipCount < $targetSkipCount) {
+                fclose($handle);
+                return [];
+            }
+        }
+        
+        // Now collect the logs for this page
+        $buffer = $buffer ?: '';
+        $inEntry = !empty($buffer);
+        $foundMatchesCount = 0;
+        
+        while ($foundMatchesCount < $perPage) {
+            if (!$inEntry) {
+                // Try to start a new entry
+                $line = fgets($handle);
+                if ($line === false) {
+                    break; // End of file
+                }
+                
+                if (preg_match($pattern, $line, $matches)) {
+                    $date = $matches[1];
+                    $environment = $matches[2];
+                    $logLevel = strtolower($matches[3]);
+                    
+                    $currentEntry = [
+                        'level' => $logLevel,
+                        'date' => $date,
+                        'environment' => $environment,
+                    ];
+                    
+                    $buffer = $line;
+                    $inEntry = true;
+                }
+                continue;
+            }
+            
+            // Read until we find the next log entry
+            $line = fgets($handle);
+            
+            // If we've reached the end of the file or found a new entry
+            if ($line === false || preg_match($pattern, $line, $matches)) {
+                // Process the completed entry
+                $message = trim(substr($buffer, strpos($buffer, ':') + 1));
+                
+                // Apply filters
+                $shouldInclude = true;
+                
+                if ($level && strtolower($currentEntry['level']) !== strtolower($level)) {
+                    $shouldInclude = false;
+                }
+                
+                $hasSearchMatch = $query && 
+                               (stripos($message, $query) !== false || 
+                                stripos($currentEntry['date'], $query) !== false);
+                                
+                if ($query && !$hasSearchMatch) {
+                    $shouldInclude = false;
+                }
+                
+                if ($shouldInclude) {
+                    $logs[] = [
+                        'level' => $currentEntry['level'],
+                        'date' => $currentEntry['date'],
+                        'environment' => $currentEntry['environment'],
+                        'message' => $this->formatMessage($message),
+                        'is_long' => (substr_count($message, "\n") > 1 || strlen($message) > 300),
+                        'has_search_match' => $hasSearchMatch,
+                    ];
+                    $foundMatchesCount++;
+                }
+                
+                // If we've reached the end of the file, break
+                if ($line === false) {
+                    break;
                 }
                 
                 // Start a new entry
@@ -308,45 +396,12 @@ class LogViewerController extends Controller
                     'level' => $logLevel,
                     'date' => $date,
                     'environment' => $environment,
-                    'message' => trim(substr($line, strpos($line, ':') + 1)),
                 ];
                 
-                $inEntry = true;
-            } elseif ($inEntry && $currentEntry) {
-                // Append to the current entry's message
-                $currentEntry['message'] .= "\n" . $line;
-            }
-        }
-        
-        // Process the last entry
-        if ($inEntry && $currentEntry) {
-            $shouldInclude = true;
-            
-            if ($level && strtolower($currentEntry['level']) !== strtolower($level)) {
-                $shouldInclude = false;
-            }
-            
-            if ($query && stripos($currentEntry['message'], $query) === false && 
-                stripos($currentEntry['date'], $query) === false) {
-                $shouldInclude = false;
-            }
-            
-            if ($shouldInclude) {
-                $matchCount++;
-                
-                if ($matchCount > $offset && $matchCount <= $offset + $perPage) {
-                    $logs[] = [
-                        'level' => $currentEntry['level'],
-                        'date' => $currentEntry['date'],
-                        'environment' => $currentEntry['environment'],
-                        'message' => $this->formatMessage($currentEntry['message']),
-                        'is_long' => (substr_count($currentEntry['message'], "\n") > 1 || 
-                                     strlen($currentEntry['message']) > 300),
-                        'has_search_match' => $query && 
-                                            (stripos($currentEntry['message'], $query) !== false || 
-                                             stripos($currentEntry['date'], $query) !== false),
-                    ];
-                }
+                $buffer = $line;
+            } else {
+                // Append to the current entry's buffer
+                $buffer .= $line;
             }
         }
         
@@ -363,7 +418,7 @@ class LogViewerController extends Controller
      */
     protected function formatMessage($message)
     {
-        // Trim the message to remove extra spaces
+        // Trim the message to remove extra spaces at the beginning and end
         $message = trim($message);
         
         // Check if message contains array or object notation
@@ -379,6 +434,15 @@ class LogViewerController extends Controller
             return implode("\n", $formattedLines);
         }
         
-        return $message;
+        // Remove any extra spaces between words while preserving single spaces
+        // But keep newlines intact for proper formatting
+        $lines = explode("\n", $message);
+        $formattedLines = [];
+        
+        foreach ($lines as $line) {
+            $formattedLines[] = trim(preg_replace('/\s+/', ' ', $line));
+        }
+        
+        return implode("\n", $formattedLines);
     }
 }
