@@ -27,6 +27,9 @@
                 <button class="btn btn-primary search-current" type="button" title="Search in first file">
                     <i class="bi bi-search"></i>
                 </button>
+                <a href="{{ route('log-viewer.index') }}" class="btn btn-outline-danger ms-2" title="Clear all filters">
+                    <i class="bi bi-x-circle"></i> Clear Filters
+                </a>
             </div>
         </div>
     </div>

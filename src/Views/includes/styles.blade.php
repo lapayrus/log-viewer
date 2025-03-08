@@ -20,6 +20,9 @@
         border-bottom: 1px solid var(--border-color);
         padding: 1rem 0;
         margin-bottom: 2rem;
+        position: sticky;
+        top: 0;
+        z-index: 1000;
     }
 
     .log-container {

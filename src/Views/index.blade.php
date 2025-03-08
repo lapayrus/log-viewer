@@ -39,6 +39,9 @@
                 <button class="btn btn-secondary search-all" type="button" title="Search across all files">
                     <i class="bi bi-search-heart"></i>
                 </button>
+                <a href="{{ route('log-viewer.index', ['file' => $currentFile]) }}" class="btn btn-outline-danger ms-2" title="Clear all filters">
+                    <i class="bi bi-x-circle"></i> Clear Filters
+                </a>
             </div>
         </div>
     </div>

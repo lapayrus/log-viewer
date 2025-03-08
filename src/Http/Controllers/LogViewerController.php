@@ -428,7 +428,10 @@ class LogViewerController extends Controller
             $formattedLines = [];
             
             foreach ($lines as $line) {
-                $formattedLines[] = trim($line); // Trim each line to remove extra spaces
+                $trimmedLine = trim($line);
+                if ($trimmedLine !== '') { // Only add non-empty lines
+                    $formattedLines[] = $trimmedLine;
+                }
             }
             
             return implode("\n", $formattedLines);
@@ -440,7 +443,10 @@ class LogViewerController extends Controller
         $formattedLines = [];
         
         foreach ($lines as $line) {
-            $formattedLines[] = trim(preg_replace('/\s+/', ' ', $line));
+            $trimmedLine = trim(preg_replace('/\s+/', ' ', $line));
+            if ($trimmedLine !== '') { // Only add non-empty lines
+                $formattedLines[] = $trimmedLine;
+            }
         }
         
         return implode("\n", $formattedLines);
