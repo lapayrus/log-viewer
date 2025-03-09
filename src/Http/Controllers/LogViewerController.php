@@ -434,6 +434,15 @@ class LogViewerController extends Controller
                 }
             }
             
+            // Remove any leading/trailing empty lines from the array
+            while (!empty($formattedLines) && empty($formattedLines[0])) {
+                array_shift($formattedLines);
+            }
+            
+            while (!empty($formattedLines) && empty($formattedLines[count($formattedLines) - 1])) {
+                array_pop($formattedLines);
+            }
+            
             return implode("\n", $formattedLines);
         }
         
@@ -449,6 +458,6 @@ class LogViewerController extends Controller
             }
         }
         
-        return implode("\n", $formattedLines);
+        return implode("\n", $formattedLines);}
     }
 }

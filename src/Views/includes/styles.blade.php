@@ -119,6 +119,7 @@
         margin: 0;
         background-color: #f8fafc;
         border-radius: 0.25rem;
+        line-height: 1.4;
     }
 
     .log-message-full.show {
