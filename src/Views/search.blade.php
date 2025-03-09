@@ -30,7 +30,7 @@
             </div>
         </div>
         <div class="col-md-2">
-            <a href="{{ route('log-viewer.index', ['file' => $currentFile]) }}" class="btn btn-outline-danger ms-2" title="Clear all filters">
+            <a href="{{ route('log-viewer.index') }}" class="btn btn-outline-danger ms-2" title="Clear all filters">
                 <i class="bi bi-x-circle"></i> Clear Filters
             </a>
         </div>
