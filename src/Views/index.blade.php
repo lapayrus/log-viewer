@@ -83,32 +83,14 @@
                             <td>
                                 @if($log['is_long'])
                                     <div class="log-message-container">
-                                        <div class="log-message log-message-preview {{ $log['has_search_match'] ? 'expanded' : '' }}">
-                                            @if($query)
-{!! Str::limit(explode("\n", $log['message'])[0], 100) !!}
-                                            @else
-{{ Str::limit(explode("\n", $log['message'])[0], 100) }}
-                                            @endif
-                                        </div>
-                                        <pre class="log-message-full {{ $log['has_search_match'] ? 'show' : '' }}">
-                                            @if($query)
-{!! preg_replace('/('.preg_quote($query, '/').')/i', '<span class="search-highlight">$1</span>', htmlspecialchars($log['message'])) !!}
-                                            @else
-{{ $log['message'] }}
-                                            @endif
-                                        </pre>
+                                        <div class="log-message log-message-preview {{ $log['has_search_match'] ? 'expanded' : '' }}">@if($query){!! Str::limit(explode("\n", $log['message'])[0], 100) !!}@else{{ Str::limit(explode("\n", $log['message'])[0], 100) }}@endif</div>
+                                        <pre class="log-message-full {{ $log['has_search_match'] ? 'show' : '' }}">@if($query){!! preg_replace('/('.preg_quote($query, '/').')/i', '<span class="search-highlight">$1</span>', htmlspecialchars($log['message'])) !!}@else{{ $log['message'] }}@endif</pre>
                                         <button class="btn btn-sm btn-link toggle-message" data-action="{{ $log['has_search_match'] ? 'collapse' : 'expand' }}">
                                             {{ $log['has_search_match'] ? 'Collapse' : 'Expand' }}
                                         </button>
                                     </div>
                                 @else
-                                    <div class="log-message">
-                                        @if($query)
-{!! preg_replace('/('.preg_quote($query, '/').')/i', '<span class="search-highlight">$1</span>', htmlspecialchars($log['message'])) !!}
-                                        @else
-{{ $log['message'] }}
-                                        @endif
-                                    </div>
+                                    <div class="log-message">@if($query){!! preg_replace('/('.preg_quote($query, '/').')/i', '<span class="search-highlight">$1</span>', htmlspecialchars($log['message'])) !!}@else{{ $log['message'] }}@endif</div>
                                 @endif
                             </td>
                             <td>
