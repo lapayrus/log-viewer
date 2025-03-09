@@ -458,6 +458,6 @@ class LogViewerController extends Controller
             }
         }
         
-        return implode("\n", $formattedLines);}
+        return implode("\n", $formattedLines);
     }
 }
