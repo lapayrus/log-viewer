@@ -353,7 +353,12 @@ class LogViewerController extends Controller
             // If we've reached the end of the file or found a new entry
             if ($line === false || preg_match($pattern, $line, $matches)) {
                 // Process the completed entry
-                $message = trim(substr($buffer, strpos($buffer, ':') + 1));
+                if (preg_match('/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (\w+)\.(\w+): (.*)/s', $buffer, $matches)) {
+                    $message = trim($matches[4]);
+                } else {
+                    // Fallback to the old method if regex fails
+                    $message = trim(substr($buffer, strpos($buffer, ':') + 1));
+                }
                 
                 // Apply filters
                 $shouldInclude = true;
