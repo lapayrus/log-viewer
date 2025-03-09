@@ -2,7 +2,7 @@
 
 @section('header')
     <div class="row g-3">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <form action="{{ route('log-viewer.index') }}" method="GET" class="d-flex">
                 <select name="file" class="form-select" onchange="this.form.submit()">
                     @foreach($files as $f)
@@ -13,7 +13,7 @@
                 </select>
             </form>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <form action="{{ route('log-viewer.index') }}" method="GET" class="d-flex">
                 <input type="hidden" name="file" value="{{ $currentFile }}">
                 <select name="level" class="form-select" onchange="this.form.submit()">
@@ -28,21 +28,23 @@
         </div>
         <div class="col-md-5">
             <div class="input-group">
+                <button class="btn btn-primary search-current" type="button" title="Search Current">
+                    <i class="bi bi-search"></i>
+                </button>
                 <form action="{{ route('log-viewer.index') }}" method="GET" class="d-flex flex-grow-1">
                     <input type="hidden" name="file" value="{{ $currentFile }}">
                     <input type="hidden" name="level" value="{{ $currentLevel }}">
-                    <input type="text" name="query" class="form-control" placeholder="Search current file..." value="{{ $query }}">
+                    <input type="text" name="query" class="form-control" placeholder="Current File <- Search -> All Files" value="{{ $query }}">
                 </form>
-                <button class="btn btn-primary search-current" type="button" title="Search in current file">
-                    <i class="bi bi-search"></i>
-                </button>
-                <button class="btn btn-secondary search-all" type="button" title="Search across all files">
+                <button class="btn btn-secondary search-all" type="button" title="Search All">
                     <i class="bi bi-search-heart"></i>
                 </button>
-                <a href="{{ route('log-viewer.index', ['file' => $currentFile]) }}" class="btn btn-outline-danger ms-2" title="Clear all filters">
-                    <i class="bi bi-x-circle"></i> Clear Filters
-                </a>
             </div>
+        </div>
+        <div class="col-md-2">
+            <a href="{{ route('log-viewer.index', ['file' => $currentFile]) }}" class="btn btn-outline-danger ms-2" title="Clear all filters">
+                <i class="bi bi-x-circle"></i> Clear Filters
+            </a>
         </div>
     </div>
 @endsection
@@ -85,20 +87,26 @@
                                     <div class="log-message-container">
                                         <div class="log-message log-message-preview {{ $log['has_search_match'] ? 'expanded' : '' }}">@if($query){!! Str::limit(explode("\n", $log['message'])[0], 100) !!}@else{{ Str::limit(explode("\n", $log['message'])[0], 100) }}@endif</div>
                                         <pre class="log-message-full {{ $log['has_search_match'] ? 'show' : '' }}">@if($query){!! preg_replace('/('.preg_quote($query, '/').')/i', '<span class="search-highlight">$1</span>', htmlspecialchars($log['message'])) !!}@else{{ $log['message'] }}@endif</pre>
-                                        <button class="btn btn-sm btn-link toggle-message" data-action="{{ $log['has_search_match'] ? 'collapse' : 'expand' }}">
-                                            {{ $log['has_search_match'] ? 'Collapse' : 'Expand' }}
-                                        </button>
                                     </div>
                                 @else
                                     <div class="log-message">@if($query){!! preg_replace('/('.preg_quote($query, '/').')/i', '<span class="search-highlight">$1</span>', htmlspecialchars($log['message'])) !!}@else{{ $log['message'] }}@endif</div>
                                 @endif
                             </td>
                             <td>
-                                <button class="btn btn-sm btn-outline-secondary copy-log" 
-                                        data-message="{{ $log['message'] }}"
-                                        title="Copy message">
-                                    <i class="bi bi-clipboard"></i>
-                                </button>
+                                <div class="d-flex gap-1">
+                                    @if($log['is_long'])
+                                    <button class="btn btn-sm btn-outline-secondary toggle-message" 
+                                            data-action="{{ $log['has_search_match'] ? 'collapse' : 'expand' }}"
+                                            title="{{ $log['has_search_match'] ? 'Collapse' : 'Expand' }} message">
+                                        <i class="bi bi-{{ $log['has_search_match'] ? 'arrows-collapse' : 'arrows-expand' }}"></i>
+                                    </button>
+                                    @endif
+                                    <button class="btn btn-sm btn-outline-secondary copy-log" 
+                                            data-message="{{ $log['message'] }}"
+                                            title="Copy message">
+                                        <i class="bi bi-clipboard"></i>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     @endforeach

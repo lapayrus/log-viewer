@@ -39,20 +39,24 @@
         // Toggle message expansion/collapse
         document.querySelectorAll('.toggle-message').forEach(function(button) {
             button.addEventListener('click', function() {
-                const container = this.closest('.log-message-container');
+                const row = this.closest('tr');
+                const container = row.querySelector('.log-message-container');
                 const preview = container.querySelector('.log-message-preview');
                 const full = container.querySelector('.log-message-full');
+                const icon = this.querySelector('i');
                 
                 if (this.dataset.action === 'expand') {
                     preview.classList.add('expanded');
                     full.classList.add('show');
                     this.dataset.action = 'collapse';
-                    this.textContent = 'Collapse';
+                    this.setAttribute('title', 'Collapse message');
+                    icon.className = 'bi bi-arrows-collapse';
                 } else {
                     preview.classList.remove('expanded');
                     full.classList.remove('show');
                     this.dataset.action = 'expand';
-                    this.textContent = 'Expand';
+                    this.setAttribute('title', 'Expand message');
+                    icon.className = 'bi bi-arrows-expand';
                 }
             });
         });
@@ -61,12 +65,21 @@
         document.querySelectorAll('.copy-log').forEach(function(button) {
             button.addEventListener('click', function() {
                 const message = decodeHtmlEntities(this.dataset.message);
+                const icon = this.querySelector('i');
+                const originalIcon = icon.className;
+                
                 navigator.clipboard.writeText(message).then(function() {
-                    // Show feedback
+                    // Show visual feedback
                     const originalTitle = button.getAttribute('title');
                     button.setAttribute('title', 'Copied!');
+                    button.classList.add('btn-success');
+                    icon.className = 'bi bi-check-lg';
+                    
+                    // Reset after animation
                     setTimeout(function() {
                         button.setAttribute('title', originalTitle);
+                        button.classList.remove('btn-success');
+                        icon.className = originalIcon;
                     }, 1500);
                 });
             });
@@ -84,7 +97,8 @@
                 });
                 document.querySelectorAll('.toggle-message').forEach(function(button) {
                     button.dataset.action = 'collapse';
-                    button.textContent = 'Collapse';
+                    button.setAttribute('title', 'Collapse message');
+                    button.querySelector('i').className = 'bi bi-arrows-collapse';
                 });
             });
         }
@@ -101,7 +115,8 @@
                 });
                 document.querySelectorAll('.toggle-message').forEach(function(button) {
                     button.dataset.action = 'expand';
-                    button.textContent = 'Expand';
+                    button.setAttribute('title', 'Expand message');
+                    button.querySelector('i').className = 'bi bi-arrows-expand';
                 });
             });
         }

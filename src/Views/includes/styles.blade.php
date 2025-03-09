@@ -126,12 +126,6 @@
         display: block;
     }
 
-    .toggle-message {
-        margin-top: 0.5rem;
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
-    }
-
     .btn-primary {
         background-color: var(--primary-color);
         border-color: var(--primary-color);
